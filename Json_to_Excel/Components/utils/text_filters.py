@@ -34,7 +34,7 @@ class TextFilter:
                 r"\[mV\]",       # millivolts
                 r"\[A\]",        # amps
                 r"\[mA\]",       # milliamps
-                r"\[Hz\]",       # hertz
+                r"\[Hz\]",      # hertz
                 r"\[kHz\]",      # kilohertz
                 r"\[MHz\]",      # megahertz
                 r"\[°C\]",       # celsius

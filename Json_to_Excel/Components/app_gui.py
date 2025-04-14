@@ -2,10 +2,12 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, scrolledtext
 import threading
-from Components.json_processor import JsonProcessor
-from Components.excel_generator import ExcelGenerator
-from Components.text_filters import TextFilter
-from Components.business_rules import BusinessRules
+
+# Import modules from reorganized structure
+from Components.json.processor import JsonProcessor
+from Components.excel.generator import ExcelGenerator
+from Components.utils.text_filters import TextFilter
+from Components.utils.business_rules import BusinessRules
 
 class JsonToExcelApp:
     def __init__(self, root, debug_mode=False):

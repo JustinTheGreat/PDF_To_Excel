@@ -2,7 +2,11 @@ import os
 import json
 import traceback
 
-class JsonProcessor:
+class JsonReader:
+    """
+    Class for reading and loading JSON files from directories.
+    """
+    
     @staticmethod
     def read_json_files(directory_path, recursive=True, print_debug=True):
         """
@@ -101,81 +105,3 @@ class JsonProcessor:
                 debug_print(f"- {file_path}: {error}")
         
         return json_data
-    
-    @staticmethod
-    def analyze_json_structure(json_data, print_debug=True):
-        """
-        Analyze the structure of the JSON data to determine how to format the Excel sheet.
-        
-        Args:
-            json_data: JSON data to analyze
-            print_debug: Whether to print debug information
-            
-        Returns a dict with information about:
-        - All unique keys
-        - Maximum nesting depth for each key
-        - Whether subtitles are needed
-        """
-        def debug_print(message):
-            if print_debug:
-                print(message)
-        
-        structure_info = {
-            'keys': set(),
-            'nesting_depth': {},
-            'needs_subtitles': False
-        }
-        
-        # Debug the input
-        if isinstance(json_data, list):
-            debug_print(f"analyze_json_structure: Input is a list with {len(json_data)} items")
-        else:
-            debug_print(f"analyze_json_structure: Input is a {type(json_data).__name__}")
-        
-        # Ensure we're working with a list of objects
-        data_list = json_data if isinstance(json_data, list) else [json_data]
-        
-        for i, report in enumerate(data_list):
-            debug_print(f"Analyzing item {i+1} of {len(data_list)}")
-            
-            # Handle different JSON structures
-            fields = {}
-            if isinstance(report, dict):
-                # If report has a 'fields' key, use that, otherwise treat the whole report as fields
-                if 'fields' in report:
-                    debug_print(f"  - Found 'fields' key with {len(report['fields'])} fields")
-                    fields = report.get('fields', {})
-                else:
-                    debug_print(f"  - No 'fields' key found, treating entire object as fields with {len(report)} keys")
-                    fields = report
-            else:
-                debug_print(f"  - Item is not a dictionary, it's a {type(report).__name__}")
-                continue
-            
-            # Process each field
-            for key, value in fields.items():
-                structure_info['keys'].add(key)
-                
-                # Check for lists that need subtitles
-                if isinstance(value, list) and len(value) > 1:
-                    structure_info['nesting_depth'][key] = len(value)
-                    structure_info['needs_subtitles'] = True
-                    debug_print(f"  - Field '{key}' has a list with {len(value)} items (needs subtitles)")
-                elif key not in structure_info['nesting_depth']:
-                    structure_info['nesting_depth'][key] = 0
-                    debug_print(f"  - Field '{key}' has type {type(value).__name__}")
-        
-        debug_print(f"Analysis result: {len(structure_info['keys'])} unique keys, needs_subtitles={structure_info['needs_subtitles']}")
-        return structure_info
-    
-    @staticmethod
-    def process_filename(filename, filter_text=""):
-        """Process filename to remove extension and filter text."""
-        # Remove extension
-        display_filename = os.path.splitext(filename)[0]
-        
-        # Remove filter text if provided
-        if filter_text and filter_text in display_filename:
-            display_filename = display_filename.replace(filter_text, "").strip()
-        
-        return display_filename

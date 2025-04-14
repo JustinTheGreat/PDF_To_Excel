@@ -1,0 +1,230 @@
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
+
+class ExcelFormatter:
+    """
+    Class for handling Excel formatting operations such as styles, headers, and layout.
+    """
+    
+    def __init__(self):
+        """Initialize Excel formatter with default styling."""
+        self.thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        self.header_style = {
+            'font': Font(bold=True),
+            'fill': PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid"),
+            'border': self.thin_border
+        }
+        
+        self.subtitle_style = {
+            'font': Font(bold=True, italic=True),
+            'fill': PatternFill(start_color="EEEEEE", end_color="EEEEEE", fill_type="solid"),
+            'border': self.thin_border
+        }
+    
+    def apply_cell_style(self, cell, style_dict):
+        """Apply a dictionary of styles to a cell."""
+        for attr, value in style_dict.items():
+            setattr(cell, attr, value)
+    
+    def sanitize_sheet_name(self, sheet_name, max_length=31):
+        """
+        Sanitize a sheet name for use in Excel.
+        
+        Args:
+            sheet_name: The original sheet name to sanitize
+            max_length: Maximum length for Excel sheet names (default: 31)
+            
+        Returns:
+            Sanitized sheet name
+        """
+        # Remove invalid characters
+        safe_name = ''.join(c for c in sheet_name if c not in '\\/:*?[]')
+        
+        # Truncate to maximum length
+        safe_name = safe_name[:max_length]
+        
+        return safe_name
+    
+    def setup_headers(self, worksheet, structure_info):
+        """Set up the headers for a worksheet with support for nested lists."""
+        # Set up the filename header
+        filename_header = worksheet.cell(row=1, column=1, value="File Name")
+        self.apply_cell_style(filename_header, self.header_style)
+        
+        # Determine the number of subtitle rows needed
+        max_nesting_level = 0
+        for key in structure_info['keys']:
+            if key in structure_info['nesting_depth']:
+                max_nesting_level = max(max_nesting_level, structure_info['nesting_depth'][key])
+        
+        num_subtitle_rows = max_nesting_level if max_nesting_level > 0 else 0
+        
+        # Add subtitle rows if needed
+        for row in range(2, 2 + num_subtitle_rows):
+            subtitle_cell = worksheet.cell(row=row, column=1, value="")
+            self.apply_cell_style(subtitle_cell, self.subtitle_style)
+        
+        # Set up field headers
+        current_column = 2
+        for key in sorted(structure_info['keys']):
+            # Get nesting information
+            nesting_depth = structure_info['nesting_depth'].get(key, 0)
+            nesting_structure = structure_info['nesting_structure'].get(key, [])
+            
+            # Calculate total columns needed for this field
+            total_columns = self._calculate_total_columns(nesting_structure)
+            
+            # Set the header (key)
+            header_cell = worksheet.cell(row=1, column=current_column, value=key)
+            self.apply_cell_style(header_cell, self.header_style)
+            
+            if total_columns > 1:
+                # This field has multiple items - needs subtitles
+                # First, merge the header cell across all the items
+                merge_end_column = current_column + total_columns - 1
+                worksheet.merge_cells(
+                    start_row=1, 
+                    start_column=current_column, 
+                    end_row=1, 
+                    end_column=merge_end_column
+                )
+                
+                # Center the merged header
+                header_cell.alignment = Alignment(horizontal='center')
+                
+                # Generate hierarchical subtitles
+                self._create_hierarchical_subtitles(
+                    worksheet, 
+                    key, 
+                    current_column, 
+                    nesting_structure, 
+                    2,  # Start at row 2
+                    num_subtitle_rows
+                )
+                
+                current_column += total_columns
+            else:
+                # This field has a single value or is not a list
+                if structure_info['needs_subtitles']:
+                    # If other fields have subtitles, add blank subtitle cells for consistency
+                    for row in range(2, 2 + num_subtitle_rows):
+                        subtitle_cell = worksheet.cell(row=row, column=current_column, value="")
+                        self.apply_cell_style(subtitle_cell, self.subtitle_style)
+                
+                current_column += 1
+    
+    def _calculate_total_columns(self, dimensions):
+        """
+        Calculate the total number of columns needed for a nested structure.
+        
+        Args:
+            dimensions: List of dimensions at each nesting level [d1, d2, d3, ...]
+        
+        Returns:
+            Total number of columns needed
+        """
+        if not dimensions:
+            return 1
+        
+        # Multiply all dimensions together
+        total = 1
+        for dim in dimensions:
+            total *= max(1, dim)  # Ensure at least 1 column even for empty dimensions
+        
+        return total
+    
+    def _create_hierarchical_subtitles(self, worksheet, key, start_column, dimensions, start_row, max_rows):
+        """
+        Create hierarchical subtitles for nested lists.
+        
+        Args:
+            worksheet: The worksheet to add subtitles to
+            key: The field key (for naming)
+            start_column: Starting column for the subtitles
+            dimensions: List of dimensions at each nesting level [d1, d2, d3, ...]
+            start_row: Starting row for the subtitles
+            max_rows: Maximum number of subtitle rows
+        """
+        if not dimensions:
+            return
+        
+        # Create a recursive function to generate subtitles
+        def create_subtitles(level, prefix, col_start, col_span, row):
+            if level >= len(dimensions) or row > max_rows + 1:
+                return
+            
+            dim = dimensions[level]
+            if dim <= 0:
+                # Handle empty level
+                dim = 1
+            
+            # Calculate column span for each item at this level
+            item_span = col_span // dim
+            
+            for i in range(dim):
+                # Calculate column range for this item
+                item_start = col_start + (i * item_span)
+                item_end = item_start + item_span - 1
+                
+                # Create the subtitle for this item
+                if prefix:
+                    subtitle = f"{prefix} - #{i+1}"
+                else:
+                    subtitle = f"{key} - #{i+1}"
+                
+                # Create and merge the subtitle cell
+                subtitle_cell = worksheet.cell(row=row, column=item_start, value=subtitle)
+                self.apply_cell_style(subtitle_cell, self.subtitle_style)
+                
+                if item_span > 1:
+                    worksheet.merge_cells(
+                        start_row=row,
+                        start_column=item_start,
+                        end_row=row,
+                        end_column=item_end
+                    )
+                    subtitle_cell.alignment = Alignment(horizontal='center')
+                
+                # Recurse to next level with updated prefix
+                if level < len(dimensions) - 1:
+                    create_subtitles(level + 1, subtitle, item_start, item_span, row + 1)
+        
+        # Start the recursive subtitle creation
+        create_subtitles(0, "", start_column, self._calculate_total_columns(dimensions), start_row)
+    
+    def get_column_count(self, structure_info):
+        """Calculate the total number of columns needed based on structure info."""
+        count = 1  # Start with 1 for the filename column
+        
+        for key in structure_info['keys']:
+            nesting_structure = structure_info['nesting_structure'].get(key, [])
+            if nesting_structure:
+                count += self._calculate_total_columns(nesting_structure)
+            else:
+                count += 1
+                
+        return count
+    
+    def adjust_column_widths(self, worksheet, num_columns, last_row):
+        """Adjust column widths based on content."""
+        for col_idx in range(1, num_columns + 1):
+            max_length = 0
+            column = get_column_letter(col_idx)
+            
+            # Check all rows
+            for row in range(1, last_row + 1):
+                cell = worksheet.cell(row=row, column=col_idx)
+                if cell.value:
+                    text_length = len(str(cell.value))
+                    max_length = max(max_length, text_length)
+            
+            # Set column width (with some padding)
+            if max_length > 0:
+                adjusted_width = max_length + 2  # Add padding
+                worksheet.column_dimensions[column].width = adjusted_width
