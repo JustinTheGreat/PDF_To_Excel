@@ -2,9 +2,10 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, scrolledtext
 import threading
-from json_processor import JsonProcessor
-from excel_generator import ExcelGenerator
-from text_filters import TextFilter
+from Components.json_processor import JsonProcessor
+from Components.excel_generator import ExcelGenerator
+from Components.text_filters import TextFilter
+from Components.business_rules import BusinessRules
 
 class JsonToExcelApp:
     def __init__(self, root, debug_mode=False):
@@ -231,37 +232,24 @@ class JsonToExcelApp:
             file_count = len(all_json_data)
             self.update_ui("debug", f"Found {file_count} JSON files")
             
-            # Log each file that was found
-            if self.debug_mode:
-                for idx, (filename, data) in enumerate(all_json_data.items()):
-                    data_type = type(data).__name__
-                    if isinstance(data, list):
-                        item_count = len(data)
-                        self.update_ui("debug", f"File {idx+1}: {filename} - Type: {data_type} with {item_count} items")
-                    else:
-                        self.update_ui("debug", f"File {idx+1}: {filename} - Type: {data_type}")
-                    
-                    # Log first few keys of each file's data
-                    if isinstance(data, dict):
-                        keys = list(data.keys())[:5]  # Get first 5 keys
-                        self.update_ui("debug", f"  Sample keys: {keys}")
-                    elif isinstance(data, list) and data and isinstance(data[0], dict):
-                        keys = list(data[0].keys())[:5]  # Get first 5 keys of first item
-                        self.update_ui("debug", f"  Sample keys in first item: {keys}")
+            # Apply business rules to transform the data
+            self.update_ui("status", "Applying business rules...")
+            self.update_ui("debug", "Starting to apply business rules transformations")
+            transformed_data = BusinessRules.transform_all_data(all_json_data)
+            self.update_ui("debug", "Business rules applied successfully")
             
-            if not all_json_data:
+            if not transformed_data:
                 self.update_ui("status", "No JSON files found or all files were empty")
                 self.root.after(0, lambda: messagebox.showerror("Error", "No valid JSON files found in the selected directory"))
                 return
             
             # Show file count
-            file_count = len(all_json_data)
             self.update_ui("status", f"Found {file_count} JSON files. Creating Excel file...")
             
-            # Create Excel file
+            # Create Excel file with the transformed data
             self.update_ui("debug", f"Starting Excel file creation at: {excel_file}")
             success = self.excel_generator.create_excel_file(
-                all_json_data,
+                transformed_data,  # Use transformed data instead of original
                 excel_file,
                 filter_text,
                 filter_units,

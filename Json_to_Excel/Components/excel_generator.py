@@ -2,8 +2,8 @@ import openpyxl
 import traceback
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
-from json_processor import JsonProcessor
-from text_filters import TextFilter
+from Components.json_processor import JsonProcessor
+from Components.text_filters import TextFilter
 
 class ExcelGenerator:
     def __init__(self):
