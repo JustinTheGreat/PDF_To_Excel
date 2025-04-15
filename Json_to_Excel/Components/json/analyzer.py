@@ -1,14 +1,14 @@
 class JsonAnalyzer:
     """
     Enhanced class for analyzing the structure of JSON data to determine formatting needs.
-    Support for multiple levels of nesting and hierarchical key-value lists.
+    Support for multiple levels of nesting and key-value pair lists.
     """
     
     @staticmethod
     def analyze_json_structure(json_data, print_debug=True):
         """
         Analyze the structure of the JSON data to determine how to format the Excel sheet.
-        Now supports multiple levels of nesting, key-value pair lists, and nested key-value lists.
+        Now supports multiple levels of nesting and key-value pair lists.
         
         Args:
             json_data: JSON data to analyze
@@ -19,7 +19,6 @@ class JsonAnalyzer:
         - Maximum nesting depth for each key with nested dimensions
         - Whether subtitles are needed
         - Key-value list information
-        - Multi-level key-value list information
         """
         def debug_print(message):
             if print_debug:
@@ -27,11 +26,10 @@ class JsonAnalyzer:
         
         structure_info = {
             'keys': set(),
-            'nesting_depth': {},  # Will store nested dimensions for each key
+            'nesting_depth': {},  # Now will store nested dimensions for each key
             'nesting_structure': {},  # Will store the structure of nested arrays
             'needs_subtitles': False,
-            'kv_lists': {},  # Store info about key-value pair lists
-            'multilevel_kv': {},  # NEW: Store info about multi-level key-value structures
+            'kv_lists': {},  # New: store info about key-value pair lists
         }
         
         # Debug the input
@@ -64,36 +62,8 @@ class JsonAnalyzer:
             for key, value in fields.items():
                 structure_info['keys'].add(key)
                 
-                # NEW: Check for multi-level key-value hierarchies
-                if JsonAnalyzer._is_multilevel_key_value(value):
-                    debug_print(f"  - Field '{key}' appears to be a multi-level key-value structure")
-                    
-                    # Analyze the multi-level structure
-                    multilevel_structure = JsonAnalyzer._analyze_multilevel_key_value(value)
-                    
-                    if multilevel_structure['is_multilevel']:
-                        debug_print(f"  - Confirmed as multi-level key-value with {len(multilevel_structure['level_info'])} levels")
-                        structure_info['multilevel_kv'][key] = multilevel_structure
-                        structure_info['needs_subtitles'] = True
-                        
-                        # Set nesting depth for multi-level KV structures
-                        max_level = multilevel_structure['max_level']
-                        structure_info['nesting_depth'][key] = max_level
-                        
-                        # Calculate dimensions based on number of keys at each level
-                        dimensions = []
-                        for level in range(1, max_level + 1):
-                            if level in multilevel_structure['level_info']:
-                                dimensions.append(len(multilevel_structure['level_info'][level]['unique_keys']))
-                            else:
-                                dimensions.append(1)
-                        
-                        structure_info['nesting_structure'][key] = dimensions
-                        debug_print(f"  - Multi-level structure has dimensions: {dimensions}")
-                        continue
-                
-                # Check for standard key-value lists
-                elif JsonAnalyzer._is_key_value_list(value):
+                # NEW: Check for list of dictionaries with consistent keys (potential key-value list)
+                if JsonAnalyzer._is_key_value_list(value):
                     debug_print(f"  - Field '{key}' appears to be a key-value list")
                     
                     # Analyze the list structure
@@ -136,134 +106,6 @@ class JsonAnalyzer:
         
         debug_print(f"Analysis result: {len(structure_info['keys'])} unique keys, needs_subtitles={structure_info['needs_subtitles']}")
         return structure_info
-    
-    @staticmethod
-    def _is_multilevel_key_value(value):
-        """
-        Determine if a value is a multi-level key-value structure.
-        This could be:
-        1. A list of dictionaries where values are also dictionaries or lists of dictionaries
-        2. A dictionary with nested dictionaries or lists of dictionaries
-        
-        Args:
-            value: The value to check
-            
-        Returns:
-            Boolean indicating if this appears to be a multi-level key-value structure
-        """
-        # Case 1: List of dictionaries with dictionaries as values
-        if isinstance(value, list) and len(value) > 0 and all(isinstance(item, dict) for item in value):
-            # Check if any values in these dictionaries are also dictionaries or lists of dictionaries
-            for item in value:
-                for k, v in item.items():
-                    if isinstance(v, dict) or (isinstance(v, list) and len(v) > 0 and all(isinstance(x, dict) for x in v)):
-                        return True
-            
-        # Case 2: Dictionary with values that are lists of dictionaries
-        elif isinstance(value, dict):
-            for k, v in value.items():
-                if isinstance(v, list) and len(v) > 0 and all(isinstance(item, dict) for item in v):
-                    return True
-        
-        return False
-    
-    @staticmethod
-    def _analyze_multilevel_key_value(value):
-        """
-        Analyze a multi-level key-value structure to extract metadata.
-        
-        Args:
-            value: A multi-level key-value structure to analyze
-            
-        Returns:
-            Dictionary with analysis results containing level information
-        """
-        result = {
-            'is_multilevel': False,
-            'max_level': 0,
-            'level_info': {},  # Will contain info for each level: {level: {unique_keys: [...], ...}}
-            'structure_type': None  # 'list_of_dicts', 'dict_of_lists', etc.
-        }
-        
-        # Determine the structure type
-        if isinstance(value, list) and len(value) > 0 and all(isinstance(item, dict) for item in value):
-            result['structure_type'] = 'list_of_dicts'
-            
-            # Level 1: Keys from the dictionaries in the list
-            level1_keys = set()
-            for item in value:
-                for k in item.keys():
-                    level1_keys.add(k)
-            
-            result['level_info'][1] = {
-                'unique_keys': sorted(level1_keys),
-                'has_consistent_keys': all(set(item.keys()) == level1_keys for item in value)
-            }
-            
-            # Check for level 2: Look for dictionaries or lists of dictionaries as values
-            level2_keys = {}  # Mapping from level1 key to its level2 keys
-            
-            for item in value:
-                for k, v in item.items():
-                    if isinstance(v, dict):
-                        if k not in level2_keys:
-                            level2_keys[k] = set()
-                        for k2 in v.keys():
-                            level2_keys[k].add(k2)
-                    elif isinstance(v, list) and len(v) > 0 and all(isinstance(x, dict) for x in v):
-                        if k not in level2_keys:
-                            level2_keys[k] = set()
-                        # Collect all unique keys from all dictionaries in the list
-                        for dict_item in v:
-                            for k2 in dict_item.keys():
-                                level2_keys[k].add(k2)
-            
-            # If we found any level 2 keys
-            if level2_keys:
-                result['level_info'][2] = {
-                    'parent_keys': sorted(level2_keys.keys()),
-                    'key_mapping': {k: sorted(keys) for k, keys in level2_keys.items()}
-                }
-                result['max_level'] = 2
-                result['is_multilevel'] = True
-            else:
-                result['max_level'] = 1
-                result['is_multilevel'] = True
-                
-        elif isinstance(value, dict):
-            result['structure_type'] = 'dict_of_lists'
-            
-            # Level 1: Keys from the main dictionary
-            level1_keys = sorted(value.keys())
-            result['level_info'][1] = {
-                'unique_keys': level1_keys
-            }
-            
-            # Check for level 2
-            level2_keys = {}
-            
-            for k, v in value.items():
-                if isinstance(v, list) and len(v) > 0 and all(isinstance(item, dict) for item in v):
-                    # Collect all unique keys from all dictionaries in the list
-                    if k not in level2_keys:
-                        level2_keys[k] = set()
-                    for dict_item in v:
-                        for k2 in dict_item.keys():
-                            level2_keys[k].add(k2)
-            
-            # If we found any level 2 keys
-            if level2_keys:
-                result['level_info'][2] = {
-                    'parent_keys': sorted(level2_keys.keys()),
-                    'key_mapping': {k: sorted(keys) for k, keys in level2_keys.items()}
-                }
-                result['max_level'] = 2
-                result['is_multilevel'] = True
-            else:
-                result['max_level'] = 1
-                result['is_multilevel'] = True
-        
-        return result
     
     @staticmethod
     def _is_key_value_list(value):
