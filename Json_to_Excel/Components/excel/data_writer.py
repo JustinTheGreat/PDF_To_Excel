@@ -3,13 +3,14 @@ from Components.utils.file_utils import FileUtils
 
 class ExcelDataWriter:
     """
-    Class for writing data to Excel worksheets with support for complex data structures.
+    Enhanced class for writing data to Excel worksheets with support for complex data structures
+    including nested lists and key-value pair lists.
     """
     
     def add_data_row(self, worksheet, row_num, file_name, fields, structure_info, max_list_lengths, 
                      filter_text="", apply_value_filters=True):
         """
-        Add a row of data to the worksheet with support for nested lists.
+        Add a row of data to the worksheet with support for nested lists and key-value lists.
         
         Args:
             worksheet: The worksheet to write to
@@ -35,8 +36,21 @@ class ExcelDataWriter:
             value = fields.get(key, "")
             nesting_structure = structure_info['nesting_structure'].get(key, [])
             
-            # Handle the different value types
-            if nesting_structure:
+            # Check if this is a key-value list field
+            if 'kv_lists' in structure_info and key in structure_info['kv_lists']:
+                # Handle key-value list type fields
+                column_increment = self._add_key_value_list_data(
+                    worksheet,
+                    row_num,
+                    current_column,
+                    value,
+                    structure_info['kv_lists'][key],
+                    apply_value_filters
+                )
+                current_column += column_increment
+            
+            # Handle the different value types for regular lists
+            elif nesting_structure:
                 # This field might have nested lists
                 column_increment = self._add_nested_data(
                     worksheet, 
@@ -62,6 +76,54 @@ class ExcelDataWriter:
                 # Set the processed value
                 worksheet.cell(row=row_num, column=current_column, value=value_to_set)
                 current_column += 1
+    
+    def _add_key_value_list_data(self, worksheet, row_num, start_column, value, kv_list_info, apply_value_filters):
+        """
+        Add key-value list data to a worksheet row.
+        
+        Args:
+            worksheet: The worksheet to add data to
+            row_num: The row number
+            start_column: The starting column
+            value: The value (list of dictionaries)
+            kv_list_info: Information about the key-value list structure
+            apply_value_filters: Whether to apply text filters to values
+        
+        Returns:
+            The number of columns used
+        """
+        # Get the ordered list of keys
+        ordered_keys = kv_list_info['unique_keys']
+        total_columns = len(ordered_keys)
+        
+        # Initialize all cells to empty
+        for col in range(start_column, start_column + total_columns):
+            worksheet.cell(row=row_num, column=col, value="")
+        
+        # Handle if value is not a list or is empty
+        if not isinstance(value, list) or not value:
+            return total_columns
+        
+        # Extract values for each key from the first item in the list
+        # (We assume the first item has the information we want)
+        first_item = value[0]
+        if not isinstance(first_item, dict):
+            return total_columns
+            
+        # Add value for each key in the order specified
+        for i, key in enumerate(ordered_keys):
+            if key in first_item:
+                item_value = first_item[key]
+                
+                # Apply filters if needed
+                if apply_value_filters and isinstance(item_value, str):
+                    item_value = TextFilter.remove_units(item_value)
+                
+                # Set the cell value
+                col = start_column + i
+                worksheet.cell(row=row_num, column=col, value=item_value)
+        
+        return total_columns
     
     def _add_nested_data(self, worksheet, row_num, start_column, value, dimensions, apply_value_filters):
         """

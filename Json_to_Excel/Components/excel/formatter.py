@@ -3,7 +3,7 @@ from openpyxl.utils import get_column_letter
 
 class ExcelFormatter:
     """
-    Class for handling Excel formatting operations such as styles, headers, and layout.
+    Enhanced class for handling Excel formatting operations with support for key-value lists.
     """
     
     def __init__(self):
@@ -52,7 +52,7 @@ class ExcelFormatter:
         return safe_name
     
     def setup_headers(self, worksheet, structure_info):
-        """Set up the headers for a worksheet with support for nested lists."""
+        """Set up the headers for a worksheet with support for nested lists and key-value lists."""
         # Set up the filename header
         filename_header = worksheet.cell(row=1, column=1, value="File Name")
         self.apply_cell_style(filename_header, self.header_style)
@@ -73,7 +73,19 @@ class ExcelFormatter:
         # Set up field headers
         current_column = 2
         for key in sorted(structure_info['keys']):
-            # Get nesting information
+            # Check if this is a key-value list field
+            if 'kv_lists' in structure_info and key in structure_info['kv_lists']:
+                # Handle key-value list type fields
+                current_column = self._setup_key_value_list_headers(
+                    worksheet,
+                    current_column,
+                    key,
+                    structure_info['kv_lists'][key],
+                    num_subtitle_rows
+                )
+                continue
+            
+            # Handle regular nested lists
             nesting_depth = structure_info['nesting_depth'].get(key, 0)
             nesting_structure = structure_info['nesting_structure'].get(key, [])
             
@@ -118,6 +130,64 @@ class ExcelFormatter:
                         self.apply_cell_style(subtitle_cell, self.subtitle_style)
                 
                 current_column += 1
+    
+    def _setup_key_value_list_headers(self, worksheet, start_column, parent_key, kv_list_info, num_subtitle_rows):
+        """
+        Set up headers for a key-value list field.
+        
+        Args:
+            worksheet: The worksheet to add headers to
+            start_column: Starting column for the headers
+            parent_key: The parent field key
+            kv_list_info: Information about the key-value list structure
+            num_subtitle_rows: Number of subtitle rows available
+            
+        Returns:
+            Next column position after setting up headers
+        """
+        # Get the list of unique keys in the dictionary items
+        unique_keys = kv_list_info['unique_keys']
+        total_columns = len(unique_keys)
+        
+        # Create the parent header merged across all columns
+        header_cell = worksheet.cell(row=1, column=start_column, value=parent_key)
+        self.apply_cell_style(header_cell, self.header_style)
+        
+        if total_columns > 1:
+            # Merge the parent header across all columns
+            merge_end_column = start_column + total_columns - 1
+            worksheet.merge_cells(
+                start_row=1,
+                start_column=start_column,
+                end_row=1,
+                end_column=merge_end_column
+            )
+            
+            # Center the merged header
+            header_cell.alignment = Alignment(horizontal='center')
+            
+            # Create subtitles for each key in the key-value list
+            for i, key in enumerate(unique_keys):
+                col = start_column + i
+                subtitle_cell = worksheet.cell(row=2, column=col, value=key)
+                self.apply_cell_style(subtitle_cell, self.subtitle_style)
+                
+                # Add empty subtitle cells for any remaining subtitle rows
+                for row in range(3, 2 + num_subtitle_rows):
+                    empty_cell = worksheet.cell(row=row, column=col, value="")
+                    self.apply_cell_style(empty_cell, self.subtitle_style)
+        else:
+            # Only one key, use it as subtitle if there are subtitle rows
+            if num_subtitle_rows > 0:
+                subtitle_cell = worksheet.cell(row=2, column=start_column, value=unique_keys[0])
+                self.apply_cell_style(subtitle_cell, self.subtitle_style)
+                
+                # Add empty subtitle cells for any remaining subtitle rows
+                for row in range(3, 2 + num_subtitle_rows):
+                    empty_cell = worksheet.cell(row=row, column=start_column, value="")
+                    self.apply_cell_style(empty_cell, self.subtitle_style)
+        
+        return start_column + total_columns
     
     def _calculate_total_columns(self, dimensions):
         """
@@ -199,15 +269,21 @@ class ExcelFormatter:
         create_subtitles(0, "", start_column, self._calculate_total_columns(dimensions), start_row)
     
     def get_column_count(self, structure_info):
-        """Calculate the total number of columns needed based on structure info."""
+        """Calculate the total number of columns needed based on structure info including key-value lists."""
         count = 1  # Start with 1 for the filename column
         
         for key in structure_info['keys']:
-            nesting_structure = structure_info['nesting_structure'].get(key, [])
-            if nesting_structure:
-                count += self._calculate_total_columns(nesting_structure)
+            # Handle key-value list fields
+            if 'kv_lists' in structure_info and key in structure_info['kv_lists']:
+                # For key-value lists, count the number of unique keys
+                count += len(structure_info['kv_lists'][key]['unique_keys'])
             else:
-                count += 1
+                # Handle regular nested lists
+                nesting_structure = structure_info['nesting_structure'].get(key, [])
+                if nesting_structure:
+                    count += self._calculate_total_columns(nesting_structure)
+                else:
+                    count += 1
                 
         return count
     

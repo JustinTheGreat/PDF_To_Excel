@@ -10,6 +10,71 @@ class BusinessRules:
     separate from the core Excel generation functionality.
     """
     
+    def transform_key_value_lists(data: Dict[str, Any], debug=False) -> Dict[str, Any]:
+        """
+        Transform appropriate fields into key-value lists for better display in Excel.
+        
+        This transformation looks for fields containing lists of dictionaries with 
+        consistent keys and converts them into a format that the Excel generator
+        will recognize as key-value lists.
+        
+        Example:
+            "Parameters": [
+                {"name": "Frequency", "value": "60 Hz"},
+                {"name": "Voltage", "value": "230 V"}
+            ]
+            
+        Will be processed specially to show as subtitles in Excel.
+        
+        Args:
+            data: The data dictionary to transform
+            debug: Whether to print debug messages
+            
+        Returns:
+            Transformed data dictionary
+        """
+        if not isinstance(data, dict):
+            if debug:
+                print(f"  Not processing non-dictionary data of type {type(data)}")
+            return data
+        
+        result = data.copy()
+        
+        # Look for fields dictionary if it exists
+        fields = result.get('fields', result)
+        
+        # Verify fields is a dictionary
+        if not isinstance(fields, dict):
+            if debug:
+                print(f"  'fields' is not a dictionary, it's a {type(fields)}")
+            return result
+                
+        if debug:
+            print(f"  Examining {len(fields)} fields for key-value lists")
+        
+        # Find potential key-value list fields (lists of dictionaries)
+        for key, value in fields.items():
+            if isinstance(value, list) and value and all(isinstance(item, dict) for item in value):
+                if debug:
+                    print(f"  Found potential key-value list in field '{key}'")
+                
+                # Check if all dictionaries have the same keys
+                if value:
+                    first_keys = set(value[0].keys())
+                    if all(set(item.keys()) == first_keys for item in value):
+                        if debug:
+                            print(f"  Confirmed key-value list with keys: {first_keys}")
+                        
+                        # This field is already in the right format for the enhanced Excel generator
+                        # No transformation needed, but we can mark this for debug purposes
+                        if debug:
+                            print(f"  Field '{key}' will be processed as a key-value list")
+        
+        # If we were working with a nested 'fields' dictionary, update it
+        if 'fields' in result and result['fields'] is not fields:
+            result['fields'] = fields
+                
+        return result
     @staticmethod
     def transform_data(json_data: Dict[str, Any], debug=False) -> Dict[str, Any]:
         """
@@ -26,6 +91,9 @@ class BusinessRules:
         
         # Apply specific transformations with debug flag
         result = BusinessRules.transform_overshoot_values(result, debug)
+        
+        # Add the new transformation
+        result = BusinessRules.transform_key_value_lists(result, debug)
         
         # Add more transformations here as needed
         
