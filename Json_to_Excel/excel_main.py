@@ -1,7 +1,7 @@
 import tkinter as tk
 import argparse
 import sys
-from app_gui import JsonToExcelApp
+from Components.app_gui import JsonToExcelApp
 
 def main():
     """Main entry point for the application."""

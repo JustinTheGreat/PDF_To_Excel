@@ -59,15 +59,15 @@ class JsonAnalyzer:
                 continue
             
             # Process each field
-            for key, value in fields.items():
+            for key, field_value in fields.items():
                 structure_info['keys'].add(key)
                 
                 # NEW: Check for list of dictionaries with consistent keys (potential key-value list)
-                if JsonAnalyzer._is_key_value_list(value):
+                if JsonAnalyzer._is_key_value_list(field_value):
                     debug_print(f"  - Field '{key}' appears to be a key-value list")
                     
                     # Analyze the list structure
-                    kv_structure = JsonAnalyzer._analyze_key_value_list(value)
+                    kv_structure = JsonAnalyzer._analyze_key_value_list(field_value)
                     
                     if kv_structure['is_kv_list']:
                         debug_print(f"  - Confirmed as key-value list with keys: {kv_structure['unique_keys']}")
@@ -75,15 +75,19 @@ class JsonAnalyzer:
                         structure_info['needs_subtitles'] = True
                         
                         # Set nesting depth and structure for KV lists
-                        depth = 1  # We treat KV lists as having a depth of 1
-                        dimensions = [len(kv_structure['unique_keys'])]  # Number of unique keys as dimension
-                        
+                        # Account for nested objects in the depth calculation
+                        depth = 1 + kv_structure.get('max_nested_depth', 0)
                         structure_info['nesting_depth'][key] = depth
+                        
+                        # Add dimensions for KV lists 
+                        # The first dimension is the number of items in the list
+                        # Additional dimensions come from nested objects
+                        dimensions = [1]  # Only consider the first item in KV lists
                         structure_info['nesting_structure'][key] = dimensions
                         continue
                 
                 # Standard analysis for regular nested lists
-                depth, dimensions, is_nested = JsonAnalyzer._analyze_list_depth(value)
+                depth, dimensions, is_nested = JsonAnalyzer._analyze_list_depth(field_value)
                 
                 # If it has any nesting, update the structure info
                 if depth > 0:
@@ -102,10 +106,48 @@ class JsonAnalyzer:
                 elif key not in structure_info['nesting_depth']:
                     structure_info['nesting_depth'][key] = 0
                     structure_info['nesting_structure'][key] = []
-                    debug_print(f"  - Field '{key}' has type {type(value).__name__}")
+                    debug_print(f"  - Field '{key}' has type {type(field_value).__name__}")
         
         debug_print(f"Analysis result: {len(structure_info['keys'])} unique keys, needs_subtitles={structure_info['needs_subtitles']}")
         return structure_info
+    
+    @staticmethod
+    def _analyze_nested_object_structure(obj, current_path="", current_depth=0):
+        """
+        Recursively analyze nested object structure to determine hierarchical paths.
+        
+        Args:
+            obj: The object to analyze
+            current_path: Current key path
+            current_depth: Current nesting depth
+            
+        Returns:
+            Dict containing max_depth and flattened paths
+        """
+        result = {
+            'max_depth': current_depth,
+            'paths': {}
+        }
+        
+        if not isinstance(obj, dict):
+            return result
+        
+        for key, value in obj.items():
+            path = f"{current_path}.{key}" if current_path else key
+            
+            if isinstance(value, dict):
+                # Recursively analyze nested dictionary
+                nested = JsonAnalyzer._analyze_nested_object_structure(value, path, current_depth + 1)
+                result['max_depth'] = max(result['max_depth'], nested['max_depth'])
+                result['paths'].update(nested['paths'])
+            else:
+                # Leaf node
+                result['paths'][path] = {
+                    'depth': current_depth,
+                    'leaf': True
+                }
+        
+        return result
     
     @staticmethod
     def _is_key_value_list(value):
@@ -138,25 +180,41 @@ class JsonAnalyzer:
             value: A list of dictionaries to analyze
             
         Returns:
-            Dictionary with analysis results
+            Dictionary with analysis results including nested object structure
         """
         result = {
             'is_kv_list': False,
             'unique_keys': set(),
             'item_count': len(value),
-            'has_consistent_keys': False
+            'has_consistent_keys': False,
+            'nested_structure': {},  # Will hold info about nested objects
+            'max_nested_depth': 0    # Maximum depth of nested objects
         }
         
-        # Collect all unique keys
+        # Collect all unique top-level keys
         for item in value:
             for k in item.keys():
                 result['unique_keys'].add(k)
         
-        # Check if all dictionaries have the same keys
+        # Check if all dictionaries have the same top-level keys
         result['has_consistent_keys'] = all(
             set(item.keys()) == result['unique_keys']
             for item in value
         )
+        
+        # Analyze nested objects
+        if result['has_consistent_keys'] and value:
+            # Use the first item to analyze nested structure
+            first_item = value[0]
+            for key, val in first_item.items():
+                if isinstance(val, dict):
+                    # This is a nested object
+                    nested_analysis = JsonAnalyzer._analyze_nested_object_structure(val)
+                    result['nested_structure'][key] = nested_analysis
+                    result['max_nested_depth'] = max(
+                        result['max_nested_depth'], 
+                        nested_analysis['max_depth'] + 1  # +1 for the current level
+                    )
         
         # Convert unique_keys to a sorted list for consistent ordering
         result['unique_keys'] = sorted(result['unique_keys'])
