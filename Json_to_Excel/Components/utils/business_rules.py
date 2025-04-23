@@ -76,7 +76,126 @@ class BusinessRules:
             result['fields'] = fields
                 
         return result
-    
+    @staticmethod
+    def transform_number_separated_values(data: Dict[str, Any], debug=False) -> Dict[str, Any]:
+        """
+        Transform values where numbers are separated by '&' or '/' into lists.
+        Properly handles decimal numbers with commas as separators.
+        
+        Examples:
+            "Field": "123 & 456" becomes: "Field": ["123", "456"]
+            "Field": "789/123" becomes: "Field": ["789", "123"]
+            "Field": "0,97 / 2,86" becomes: "Field": ["0,97", "2,86"]
+            "Field": "text & numbers" remains: "Field": "text & numbers"
+        
+        Args:
+            data: The data dictionary to transform
+            debug: Whether to print debug messages
+            
+        Returns:
+            Transformed data dictionary
+        """
+        if not isinstance(data, dict):
+            if debug:
+                print(f"  Not processing non-dictionary data of type {type(data)}")
+            return data
+        
+        result = data.copy()
+        
+        # Look for fields dictionary if it exists
+        fields = result.get('fields', result)
+        
+        # Verify fields is a dictionary
+        if not isinstance(fields, dict):
+            if debug:
+                print(f"  'fields' is not a dictionary, it's a {type(fields)}")
+            return result
+        
+        if debug:
+            print(f"  Examining {len(fields)} fields for number separated values")
+        
+            def split_numbers(text: str) -> Union[str, List[str]]:
+                """
+                Split text on '&' or '/' when they separate decimal numbers.
+                Handles both period and comma decimal separators.
+                
+                Args:
+                    text: Text to process
+                    
+                Returns:
+                    Either the original text or a list of split values
+                """
+                if not isinstance(text, str):
+                    return text
+                    
+                # Make a working copy
+                processed_text = text.strip()
+                
+                # Simple check to see if we have separators
+                if '&' not in processed_text and '/' not in processed_text:
+                    return text
+                    
+                # For slash separator with spaces: "0,97 / 2,86"
+                slash_pattern = r'(\d+(?:[,.]\d+)?)\s*/\s*(\d+(?:[,.]\d+)?)'
+                amp_pattern = r'(\d+(?:[,.]\d+)?)\s*&\s*(\d+(?:[,.]\d+)?)'
+                
+                # Try to match the patterns
+                slash_match = re.search(slash_pattern, processed_text)
+                amp_match = re.search(amp_pattern, processed_text)
+                
+                # If the entire string matches one of our patterns, split it
+                if slash_match and slash_match.group(0) == processed_text:
+                    return [slash_match.group(1), slash_match.group(2)]
+                elif amp_match and amp_match.group(0) == processed_text:
+                    return [amp_match.group(1), amp_match.group(2)]
+                    
+                # Otherwise, return the original text
+                return text
+            
+            transformations_made = 0
+            
+            # Process all string values in the fields
+            for key, value in list(fields.items()):
+                if isinstance(value, str):
+                    transformed = split_numbers(value)
+                    if isinstance(transformed, list):
+                        if debug:
+                            print(f"  Transformed '{key}': {value} -> {transformed}")
+                        fields[key] = transformed
+                        transformations_made += 1
+                
+                # Handle nested dictionaries
+                elif isinstance(value, dict):
+                    fields[key] = BusinessRules.transform_number_separated_values(value, debug)
+                
+                # Handle lists of values
+                elif isinstance(value, list):
+                    new_list = []
+                    for item in value:
+                        if isinstance(item, str):
+                            transformed = split_numbers(item)
+                            if isinstance(transformed, list):
+                                new_list.extend(transformed)
+                                transformations_made += 1
+                            else:
+                                new_list.append(transformed)
+                        elif isinstance(item, dict):
+                            # Transform nested dictionaries
+                            new_list.append(BusinessRules.transform_number_separated_values(item, debug))
+                        else:
+                            new_list.append(item)
+                    if new_list != value:
+                        fields[key] = new_list
+            
+            if debug:
+                print(f"  Made {transformations_made} number separation transformations")
+        
+        # If we were working with a nested 'fields' dictionary, update it
+        if 'fields' in result and result['fields'] is not fields:
+            result['fields'] = fields
+        
+        return result
+        
     @staticmethod
     def transform_data(json_data: Dict[str, Any], debug=False) -> Dict[str, Any]:
         """
@@ -91,19 +210,14 @@ class BusinessRules:
         """
         result = json_data.copy()  # Create a copy to avoid modifying the original
         
-        # Apply specific transformations with debug flag
+        # Apply number separation transformation first
+        result = BusinessRules.transform_number_separated_values(result, debug)
+        
+        # Apply other transformations
         result = BusinessRules.transform_overshoot_values(result, debug)
-        
-        # Apply nested key-value list transformations
         result = BusinessRules.transform_nested_key_value_lists(result, debug)
-        
-        # Convert dictionary fields to key-value list format
         result = BusinessRules.transform_dict_fields(result, debug)
-        
-        # Apply key-value list transformation (should be done after the other transformations)
         result = BusinessRules.transform_key_value_lists(result, debug)
-        
-        # Add more transformations here as needed
         
         return result
     
@@ -307,8 +421,8 @@ class BusinessRules:
         where the first column will be for the minimum value and the second column for the maximum.
         
         Example:
-            "Overshoot [V]": "3.5 2.1" becomes:
-            "Overshoot [V]": ["2.1", "3.5"]
+            "Overshoot [V]": "3.0 2.0" becomes:
+            "Overshoot [V]": ["2.0", "3.0"]
             
         Args:
             data: The data dictionary to transform

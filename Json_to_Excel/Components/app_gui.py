@@ -19,7 +19,7 @@ class JsonToExcelApp:
         if debug_mode:
             self.root.geometry("800x700")  # Larger height for debug area
         else:
-            self.root.geometry("600x500")
+            self.root.geometry("600x550")  # Increased height for new option
         
         self.root.resizable(True, True)
         
@@ -42,6 +42,7 @@ class JsonToExcelApp:
         self.file_name_var = tk.StringVar(value="output.xlsx")
         self.filter_text_var = tk.StringVar()
         self.filter_units_var = tk.BooleanVar(value=True)
+        self.replace_commas_var = tk.BooleanVar(value=False)  # New variable for comma replacement
         self.recursive_var = tk.BooleanVar(value=True)
         self.progress_var = tk.DoubleVar()
         
@@ -88,37 +89,44 @@ class JsonToExcelApp:
             variable=self.filter_units_var
         ).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=5)
         
+        # New option: Replace commas with periods
+        ttk.Checkbutton(
+            main_frame,
+            text="Replace commas with periods in numeric values (e.g., 3,14 → 3.14)",
+            variable=self.replace_commas_var
+        ).grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=5)
+        
         # Recursive search option
         ttk.Checkbutton(
             main_frame,
             text="Search in subdirectories",
             variable=self.recursive_var
-        ).grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=5)
+        ).grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=5)
         
         # Process button
-        ttk.Button(main_frame, text="Process JSON Files", command=self.process_files).grid(row=7, column=0, columnspan=2, pady=15)
+        ttk.Button(main_frame, text="Process JSON Files", command=self.process_files).grid(row=8, column=0, columnspan=2, pady=15)
         
         # Progress bar
-        ttk.Label(main_frame, text="Progress:").grid(row=8, column=0, sticky=tk.W, pady=5)
+        ttk.Label(main_frame, text="Progress:").grid(row=9, column=0, sticky=tk.W, pady=5)
         self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var, length=300, mode='determinate')
-        self.progress_bar.grid(row=8, column=1, sticky=tk.EW, pady=5)
+        self.progress_bar.grid(row=9, column=1, sticky=tk.EW, pady=5)
         
         # Status
-        ttk.Label(main_frame, text="Status:").grid(row=9, column=0, sticky=tk.NW, pady=5)
+        ttk.Label(main_frame, text="Status:").grid(row=10, column=0, sticky=tk.NW, pady=5)
         self.status_label = ttk.Label(main_frame, text="Ready", wraplength=400)
-        self.status_label.grid(row=9, column=1, sticky=tk.W, pady=5)
+        self.status_label.grid(row=10, column=1, sticky=tk.W, pady=5)
         
         # Debug Text Area (only shown in debug mode)
         if self.debug_mode:
-            ttk.Label(main_frame, text="Debug Log:").grid(row=10, column=0, sticky=tk.NW, pady=5)
+            ttk.Label(main_frame, text="Debug Log:").grid(row=11, column=0, sticky=tk.NW, pady=5)
             self.debug_text = scrolledtext.ScrolledText(main_frame, width=70, height=15)
-            self.debug_text.grid(row=10, column=1, sticky=tk.NSEW, pady=5)
+            self.debug_text.grid(row=11, column=1, sticky=tk.NSEW, pady=5)
             
             # Add clear log button
-            ttk.Button(main_frame, text="Clear Log", command=self.clear_debug_log).grid(row=11, column=0, columnspan=2, pady=5)
+            ttk.Button(main_frame, text="Clear Log", command=self.clear_debug_log).grid(row=12, column=0, columnspan=2, pady=5)
             
             # Make debug area expandable
-            main_frame.rowconfigure(10, weight=1)
+            main_frame.rowconfigure(11, weight=1)
         
         # Configure grid weight
         main_frame.columnconfigure(1, weight=1)
@@ -178,6 +186,7 @@ class JsonToExcelApp:
         file_name = self.file_name_var.get()
         filter_text = self.filter_text_var.get()
         filter_units = self.filter_units_var.get()
+        replace_commas = self.replace_commas_var.get()  # Get the replace commas option
         recursive = self.recursive_var.get()
         
         # Clear the debug log
@@ -189,6 +198,7 @@ class JsonToExcelApp:
             self.log_debug(f"File Name: {file_name}")
             self.log_debug(f"Filter Text: {filter_text}")
             self.log_debug(f"Filter Units: {filter_units}")
+            self.log_debug(f"Replace Commas with Periods: {replace_commas}")  # Log the new option
             self.log_debug(f"Recursive: {recursive}")
         
         # Ensure file name has .xlsx extension
@@ -213,11 +223,11 @@ class JsonToExcelApp:
         # Run processing in a separate thread to avoid freezing UI
         threading.Thread(
             target=self.run_processing, 
-            args=(json_dir, excel_file, filter_text, filter_units, recursive),
+            args=(json_dir, excel_file, filter_text, filter_units, replace_commas, recursive),  # Add replace_commas parameter
             daemon=True
         ).start()
     
-    def run_processing(self, json_dir, excel_file, filter_text, filter_units, recursive):
+    def run_processing(self, json_dir, excel_file, filter_text, filter_units, replace_commas, recursive):
         """Run the JSON processing and Excel creation in a background thread."""
         try:
             # Update status
@@ -255,7 +265,8 @@ class JsonToExcelApp:
                 excel_file,
                 filter_text,
                 filter_units,
-                self.update_ui
+                self.update_ui,
+                replace_commas  # Add the new replace_commas parameter
             )
             
             if success:

@@ -34,14 +34,20 @@ class TextFilter:
                 r"\[mV\]",       # millivolts
                 r"\[A\]",        # amps
                 r"\[mA\]",       # milliamps
-                r"\[Hz\]",      # hertz
+                r"\[Hz\]",       # hertz
                 r"\[kHz\]",      # kilohertz
                 r"\[MHz\]",      # megahertz
                 r"\[°C\]",       # celsius
                 r"\[mm\]",       # millimeters
                 r"\[cm\]",       # centimeters
                 r"\[m\]",        # meters
-                r"\[\w+\]"       # catch-all for other bracketed units
+                r"\[\w+\]",      # catch-all for other bracketed units
+                r"\+/-",         # Catches "+/-"
+                r"Vac",      # AC voltage
+                r"Vdc",          # DC voltage
+                r"mA",           # milliamps (without brackets)
+                r"M Ohm",        # Mega Ohm resistance unit
+                r"Ohm",          # Ohm resistance unit
             ]
         
         # Process each pattern
@@ -50,6 +56,27 @@ class TextFilter:
         
         # Trim any whitespace
         return text.strip()
+    
+    @staticmethod
+    def replace_commas_with_periods(text):
+        """
+        Replace all commas with periods in a text string.
+        Useful for standardizing decimal notation between different regional formats.
+        
+        Args:
+            text: The text to process
+        
+        Returns:
+            Text with commas replaced by periods
+        """
+        if text is None:
+            return None
+            
+        # Convert to string if not already
+        text = str(text)
+        
+        # Replace commas with periods
+        return text.replace(',', '.')
     
     @staticmethod
     def clean_numeric_value(text):
@@ -83,7 +110,7 @@ class TextFilter:
             return cleaned_text
     
     @staticmethod
-    def process_value(value, remove_units=True, convert_numeric=False):
+    def process_value(value, remove_units=True, convert_numeric=False, replace_commas=False):
         """
         Process a value based on specified filters.
         
@@ -91,6 +118,7 @@ class TextFilter:
             value: The value to process (can be string, list, etc.)
             remove_units: Whether to remove unit notations
             convert_numeric: Whether to convert to numeric values when possible
+            replace_commas: Whether to replace commas with periods
         
         Returns:
             Processed value
@@ -100,16 +128,19 @@ class TextFilter:
             
         # Handle lists recursively
         if isinstance(value, list):
-            return [TextFilter.process_value(item, remove_units, convert_numeric) for item in value]
+            return [TextFilter.process_value(item, remove_units, convert_numeric, replace_commas) for item in value]
         
         # Handle dictionaries recursively
         if isinstance(value, dict):
-            return {k: TextFilter.process_value(v, remove_units, convert_numeric) for k, v in value.items()}
+            return {k: TextFilter.process_value(v, remove_units, convert_numeric, replace_commas) for k, v in value.items()}
         
         # Handle string values
         if isinstance(value, str):
             processed = value
             
+            if replace_commas:
+                processed = TextFilter.replace_commas_with_periods(processed)
+                
             if remove_units:
                 processed = TextFilter.remove_units(processed)
             

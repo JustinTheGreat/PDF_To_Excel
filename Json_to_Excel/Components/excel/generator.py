@@ -15,7 +15,7 @@ class ExcelGenerator:
         self.data_writer = ExcelDataWriter()
     
     def create_excel_file(self, all_json_data, output_excel_path, filter_text="", 
-                          apply_value_filters=True, callback=None):
+                          apply_value_filters=True, callback=None, replace_commas=False):
         """
         Create an Excel file based on the JSON data with support for nested lists.
         
@@ -25,6 +25,7 @@ class ExcelGenerator:
             filter_text: Text to remove from filenames
             apply_value_filters: Whether to apply text filters to values
             callback: Function to call with status updates (optional)
+            replace_commas: Whether to replace commas with periods in numeric values (default: False)
         """
         try:
             # Debug helper function
@@ -35,6 +36,7 @@ class ExcelGenerator:
             
             debug(f"Starting Excel generation with {len(all_json_data)} files")
             debug(f"Output path: {output_excel_path}")
+            debug(f"Replace commas with periods: {replace_commas}")
             
             # Create a new workbook
             workbook = openpyxl.Workbook()
@@ -209,7 +211,8 @@ class ExcelGenerator:
                         structure_info, 
                         {},  # No need for max_list_lengths anymore, using nesting_structure instead
                         filter_text, 
-                        apply_value_filters
+                        apply_value_filters,
+                        replace_commas  # Pass the replace_commas parameter to the data writer
                     )
                     
                     # Update the next row
