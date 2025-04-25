@@ -6,7 +6,7 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment, numbers
 class ExcelDataWriter:
     """
     Enhanced class for writing data to Excel worksheets with support for complex data structures
-    including nested lists, key-value pair lists, and date formatting.
+    including nested lists, key-value pair lists, date formatting, and proper number formatting.
     """
     
     def __init__(self):
@@ -51,10 +51,72 @@ class ExcelDataWriter:
                 
         return None
 
+    def _is_numeric(self, value):
+        """
+        Check if a string value can be converted to a number.
+        Handles integers, floats, and negative numbers.
+        
+        Args:
+            value: The value to check
+            
+        Returns:
+            Boolean indicating if the value is numeric
+        """
+        if value is None or not isinstance(value, str):
+            return False
+            
+        # Strip whitespace
+        value = value.strip()
+        
+        # Check if empty
+        if not value:
+            return False
+            
+        # Try to convert to float (handles integers too)
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+            
+    def _convert_to_number(self, value):
+        """
+        Convert a string value to a numeric type (int or float).
+        
+        Args:
+            value: The string value to convert
+            
+        Returns:
+            int or float if conversion is successful, original value otherwise
+        """
+        if not isinstance(value, str):
+            return value
+            
+        # Strip whitespace
+        value = value.strip()
+        
+        # Try to convert
+        try:
+            # Try integer first
+            int_val = int(value)
+            # If int and float values are the same, return int
+            if float(value) == int_val:
+                return int_val
+            # Otherwise, return float
+            return float(value)
+        except ValueError:
+            try:
+                # Try float
+                return float(value)
+            except ValueError:
+                # Return original if both fail
+                return value
+
     def add_data_row(self, worksheet, row_num, file_name, fields, structure_info, max_list_lengths, 
                      filter_text="", apply_value_filters=True, replace_commas=False):
         """
-        Add a row of data to the worksheet with support for nested lists, key-value lists, and date formatting.
+        Add a row of data to the worksheet with support for nested lists, key-value lists, date formatting,
+        and proper number formatting.
         
         Args:
             worksheet: The worksheet to write to
@@ -125,29 +187,38 @@ class ExcelDataWriter:
                 
                 # Apply text filtering if needed
                 if isinstance(value_to_set, str):
+                    # Apply comma replacement first
                     if replace_commas:
                         value_to_set = TextFilter.replace_commas_with_periods(value_to_set)
+                    
+                    # Apply unit removal if needed
                     if apply_value_filters:
                         value_to_set = TextFilter.remove_units(value_to_set)
+                    
+                    # Handle date formatting
+                    if is_date_field:
+                        date_value = self._try_parse_date(value_to_set)
+                        if date_value:
+                            cell.value = date_value
+                            cell.number_format = self.date_format
+                            current_column += 1
+                            continue
+                    
+                    # Handle numeric values - convert to actual numbers
+                    if self._is_numeric(value_to_set):
+                        value_to_set = self._convert_to_number(value_to_set)
+                        # Apply general number format for numbers
+                        cell.number_format = numbers.FORMAT_GENERAL
                 
-                # Handle date formatting
-                if is_date_field and isinstance(value_to_set, str):
-                    date_value = self._try_parse_date(value_to_set)
-                    if date_value:
-                        cell.value = date_value
-                        cell.number_format = self.date_format
-                    else:
-                        cell.value = value_to_set
-                else:
-                    cell.value = value_to_set
-                
+                cell.value = value_to_set
                 current_column += 1
     
     def _add_key_value_list_data_with_nesting(self, worksheet, row_num, start_column, 
                                             value, kv_list_info, apply_value_filters, 
                                             replace_commas, is_date_field):
         """
-        Add key-value list data to a worksheet row with support for nested objects and date formatting.
+        Add key-value list data to a worksheet row with support for nested objects, date formatting,
+        and proper number formatting.
         
         Args:
             worksheet: The worksheet to add data to
@@ -213,8 +284,11 @@ class ExcelDataWriter:
                         
                         # Apply filters if needed
                         if isinstance(prop_value, str):
+                            # Apply comma replacement first
                             if replace_commas:
                                 prop_value = TextFilter.replace_commas_with_periods(prop_value)
+                            
+                            # Apply unit removal if needed
                             if apply_value_filters:
                                 prop_value = TextFilter.remove_units(prop_value)
                             
@@ -226,6 +300,12 @@ class ExcelDataWriter:
                                     cell.number_format = self.date_format
                                     current_column += 1
                                     continue
+                            
+                            # Handle numeric values
+                            if self._is_numeric(prop_value):
+                                prop_value = self._convert_to_number(prop_value)
+                                # Apply general number format
+                                cell.number_format = numbers.FORMAT_GENERAL
                         
                         cell.value = prop_value
                         current_column += 1
@@ -235,8 +315,11 @@ class ExcelDataWriter:
                     
                     # Apply filters if needed
                     if isinstance(item_value, str):
+                        # Apply comma replacement first
                         if replace_commas:
                             item_value = TextFilter.replace_commas_with_periods(item_value)
+                        
+                        # Apply unit removal if needed
                         if apply_value_filters:
                             item_value = TextFilter.remove_units(item_value)
                         
@@ -248,6 +331,12 @@ class ExcelDataWriter:
                                 cell.number_format = self.date_format
                                 current_column += 1
                                 continue
+                        
+                        # Handle numeric values
+                        if self._is_numeric(item_value):
+                            item_value = self._convert_to_number(item_value)
+                            # Apply general number format
+                            cell.number_format = numbers.FORMAT_GENERAL
                     
                     cell.value = item_value
                     current_column += 1
@@ -265,7 +354,7 @@ class ExcelDataWriter:
     def _add_nested_data(self, worksheet, row_num, start_column, value, dimensions, 
                         apply_value_filters, replace_commas, is_date_field):
         """
-        Add nested data to a worksheet row with date support.
+        Add nested data to a worksheet row with date support and proper number formatting.
         
         Args:
             worksheet: The worksheet to add data to
@@ -284,8 +373,11 @@ class ExcelDataWriter:
             cell = worksheet.cell(row=row_num, column=start_column)
             
             if isinstance(value, str):
+                # Apply comma replacement first
                 if replace_commas:
                     value = TextFilter.replace_commas_with_periods(value)
+                
+                # Apply unit removal if needed
                 if apply_value_filters:
                     value = TextFilter.remove_units(value)
                 
@@ -296,6 +388,12 @@ class ExcelDataWriter:
                         cell.value = date_value
                         cell.number_format = self.date_format
                         return 1
+                
+                # Handle numeric values
+                if self._is_numeric(value):
+                    value = self._convert_to_number(value)
+                    # Apply general number format
+                    cell.number_format = numbers.FORMAT_GENERAL
             
             cell.value = value
             return 1
@@ -317,8 +415,11 @@ class ExcelDataWriter:
                 cell = worksheet.cell(row=row_num, column=start_column + i)
                 
                 if isinstance(item, str):
+                    # Apply comma replacement first
                     if replace_commas:
                         item = TextFilter.replace_commas_with_periods(item)
+                    
+                    # Apply unit removal if needed
                     if apply_value_filters:
                         item = TextFilter.remove_units(item)
                     
@@ -329,6 +430,12 @@ class ExcelDataWriter:
                             cell.value = date_value
                             cell.number_format = self.date_format
                             continue
+                    
+                    # Handle numeric values
+                    if self._is_numeric(item):
+                        item = self._convert_to_number(item)
+                        # Apply general number format
+                        cell.number_format = numbers.FORMAT_GENERAL
                 
                 cell.value = item
         
