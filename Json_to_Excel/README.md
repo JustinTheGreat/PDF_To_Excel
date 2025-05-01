@@ -1,107 +1,168 @@
 # JSON to Excel Converter
 
+A robust Python application that converts JSON data files into well-formatted Excel workbooks with advanced formatting and filtering capabilities.
+
 ## Overview
 
-The JSON to Excel Converter is a desktop application that allows you to convert multiple JSON files into a structured Excel workbook. It's particularly useful for analyzing reports that are stored in JSON format but need to be viewed and manipulated in Excel.
+This application processes JSON files from a selected directory (including subdirectories if specified) and converts them into a structured Excel workbook. It intelligently analyzes the JSON structure and creates appropriate worksheet layouts with headers, subtitles, and data columns. The application handles complex nested structures, key-value pairs, units, and special data types like dates and numbers.
 
 ## Features
 
-- Convert multiple JSON files into a single Excel workbook
-- Combine data from files with the same report title into single worksheets
-- Support for nested data structures and lists
-- Filter out unwanted units from values (e.g., [ms], [V])
-- Remove common text from filenames
-- Option to search in subdirectories
-- Debug mode for troubleshooting
+- **User-friendly GUI interface** with directory selection and conversion options
+- **Intelligent JSON structure analysis** to determine optimal Excel layout
+- **Support for nested data structures** including arrays and key-value pairs
+- **Multi-sheet Excel output** organized by JSON document titles
+- **Advanced data processing**:
+  - Filter specific text from filenames
+  - Remove units from values (e.g., [ms], [V])
+  - Replace commas with periods in numeric values
+  - Date detection and formatting
+  - Number format standardization
+- **Recursive directory scanning** for batch processing
+- **Debug mode** for detailed logging
 
-## File Structure and Functionality
+## Getting Started
 
-The application consists of several Python modules, each with specific responsibilities:
+### Prerequisites
 
-### excel_main.py
-- Run this script to start the program
+- Python 3.6 or higher
+- Required packages:
+  - tkinter (GUI)
+  - openpyxl (Excel generation)
 
-### app_gui.py
+### Installation
 
-This module provides the graphical user interface for the application. It:
-- Creates the main window with all UI elements
-- Handles user interactions (button clicks, directory selection)
-- Manages the progress display and status updates
-- Coordinates the conversion process
+1. Clone this repository or download the source code
+2. Install required dependencies:
 
-### json_processor.py
+```bash
+pip install openpyxl
+```
 
-This module is responsible for processing JSON files. It:
-- Reads JSON files from directories and subdirectories
-- Parses the JSON data structure
-- Analyzes the structure of reports to determine how to format the Excel output
-- Processes filenames to remove unwanted text
+Note: tkinter is included in most Python installations, but if needed:
 
-### excel_generator.py
+```bash
+# For Debian/Ubuntu
+sudo apt-get install python3-tk
 
-This module generates the Excel output from the processed JSON data. It:
-- Creates a new Excel workbook
-- Sets up worksheets based on report titles
-- Formats headers and cells with appropriate styles
-- Handles lists of varying lengths to ensure consistent column alignment
-- Adjusts column widths for better readability
-- Manages data that should be combined across multiple files
+# For Fedora
+sudo dnf install python3-tkinter
 
-### text_filters.py
+# For macOS (using Homebrew)
+brew install python-tk
+```
 
-This module provides text filtering capabilities. It:
-- Removes units from values (e.g., [ms], [V])
-- Cleanses numeric values
-- Processes different types of values (strings, lists, dictionaries)
-- Applies custom replacements to text
+### Running the Application
 
-## Using the Application
+Launch the application using:
+
+```bash
+python excel_main.py
+```
+
+For debug mode with detailed logging:
+
+```bash
+python excel_main.py --debug
+```
+
+### Usage Instructions
 
 1. **Select JSON Files Directory**: Choose the directory containing your JSON files.
-2. **Select Output Directory**: Choose where to save the Excel file.
-3. **Specify Output Filename**: Enter a name for the output Excel file.
-4. **Configure Options**:
-   - Filter Text to Remove: Remove common text from filenames
-   - Remove units: Clean values by removing unit notations
-   - Search in subdirectories: Include files from nested folders
-5. **Process Files**: Click the "Process JSON Files" button to start the conversion.
+2. **Select Output Directory**: Choose where to save the generated Excel file.
+3. **Configure Options**:
+   - **Output File Name**: Set a name for the Excel file.
+   - **Filter Text to Remove**: Specify text to remove from filenames.
+   - **Remove units**: Toggle removal of units from values.
+   - **Replace commas with periods**: Toggle decimal separator standardization.
+   - **Search in subdirectories**: Toggle whether to process files in subdirectories.
+4. **Process JSON Files**: Click to start the conversion process.
+5. **View Progress**: Monitor the progress bar and status updates.
 
-## Data Handling
+## Excel Formatting
 
-### JSON Structure
+The application applies sophisticated formatting to make the Excel output clear and well-organized:
 
-The application expects JSON files to contain report data. Each report should ideally have:
-- A `title` field identifying the report type
-- A `fields` section containing the data to be processed
+### Sheet Organization
+- Each unique report title from the JSON data gets its own worksheet
+- Sheet names are sanitized to comply with Excel's requirements
 
-However, it can also handle files without this structure by treating the entire JSON object as fields.
+### Header Formatting
+- Column headers use bold text with a light gray background
+- Headers for nested data are merged across multiple columns
+- Multi-level nested data generates appropriate subtitle rows
 
-### Worksheets Organization
+### Data Formatting
+- **Filenames**: The first column contains the processed filenames (with extensions and filtered text removed)
+- **Dates**: Automatically detected and formatted using Excel's date format
+- **Numbers**: 
+  - Properly converted from string to actual numeric values
+  - Comma decimal separators optionally converted to periods
+  - Displayed with appropriate number formatting
+- **Lists**: 
+  - Simple lists are displayed across multiple columns
+  - Key-value lists create subtitled columns with the keys as subtitles
+  - Nested lists generate hierarchical column structures
 
-- Reports with the same title are combined into a single worksheet
-- Each row represents data from one JSON file
-- The first column shows the source filename
-- Header rows identify each data field
-- For fields with multiple values (lists), subtitles show item numbers
-
-### List Handling
-
-- Lists of values are displayed across multiple columns
-- When lists have different lengths, the application maintains column alignment
-- Missing values in shorter lists result in empty cells
-- This ensures data integrity and consistent structure
-
-## Debugging
-
-When run in debug mode (`python excel_main.py --debug`), the application:
-- Shows a detailed log of the processing steps
-- Displays file counts and structures
-- Reports any errors or warnings
-- Helps identify issues with JSON files or data structure
-
-## Technical Considerations
-
-- The application uses threading to prevent the UI from freezing during processing
-- Error handling is comprehensive to prevent crashes
-- Memory usage is optimized for handling multiple files
+### Visual Enhancements
 - Column widths are automatically adjusted based on content
+- Cells have light borders for better readability
+- Headers and subtitles are centered when spanning multiple columns
+
+### Special Processing
+- Unit notations like [ms], [V], etc. are optionally stripped from values
+- Number-separated values (e.g., "123 & 456") can be split into separate values
+- Single-item lists in nested structures are flattened for cleaner display
+
+## Project Structure
+
+The application is organized in a modular structure for maintainability:
+
+```
+├── excel_main.py                 # Main entry point
+├── Components/                   # Main components directory
+│   ├── app_gui.py               # GUI implementation
+│   ├── excel/                   # Excel generation components
+│   │   ├── formatter.py         # Excel formatting utilities
+│   │   ├── generator.py         # Excel file generation logic
+│   │   └── data_writer.py       # Excel data writing utilities
+│   ├── json/                    # JSON processing components
+│   │   ├── analyzer.py          # JSON structure analysis
+│   │   ├── reader.py            # JSON file reading utilities
+│   │   ├── processor.py         # JSON processing facade
+│   │   └── structure_analyzer.py # Supplementary structure analysis
+│   └── utils/                   # Common utilities
+│       ├── business_rules.py    # Business logic for data transformation
+│       ├── text_filters.py      # Text filtering and processing utilities
+│       └── file_utils.py        # File handling utilities
+```
+
+### Key Components
+
+- **app_gui.py**: Implements the user interface with tkinter
+- **generator.py**: Orchestrates the Excel creation process
+- **analyzer.py**: Analyzes JSON structure to determine Excel formatting
+- **business_rules.py**: Contains business-specific data transformation rules
+- **data_writer.py**: Handles writing data to Excel with proper formatting
+
+## Extending the Application
+
+### Adding New Units to Filter
+
+To add support for additional units, modify the `remove_units` method in `Components/utils/text_filters.py`.
+
+### Adding New Business Rules
+
+Add custom data transformations in `Components/utils/business_rules.py`. The existing methods demonstrate the pattern to follow.
+
+### Supporting New Data Types
+
+Extend the data detection and conversion logic in `Components/excel/data_writer.py`.
+
+## License
+
+MIT License
+
+## Acknowledgments
+
+I would like to acknowledge the Javaid Baksh for being such a great engineer to work with to push the program to it's limits
