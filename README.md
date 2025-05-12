@@ -4,10 +4,11 @@ This guide focuses on using the PDF Extraction System to extract structured data
 
 ## System Overview
 
-This PDF Extraction System provides two ways to process PDF files:
+This PDF Extraction System provides a variety of processes to help extract info from PDF files:
 
-1. **Command-line interface** (`main.py`) - Process individual PDF files
-2. **Graphical user interface** (`directory_processor.py`) - Scan directories for PDF files and batch process them
+1. **Visual GUI used to process PDFs** (`main.py`) - Process Group PDF files
+2. **Preview your script finding visually** ('Previewer_main.py) - Preview your script files that you use on your reports
+3. **Convert JSON to Excel Files** ('PDF_To_Excel/Excel_main.py) - Convert your json files to excel files
 
 ## Getting Started
 
