@@ -11,7 +11,7 @@ This PDF Extraction System provides a variety of processes to help extract info 
 3. **Convert JSON to Excel Files** (`PDF_To_Excel/Excel_main.py`) - Convert your json files to excel files
 
 ## Getting Started
-<iframe width="560" height="315" src="(https://youtu.be/NppbW9ksUUc)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+[![Tutorial Video](https://i.ytimg.com/vi/YKC5575XYDo/maxresdefault.jpg)](https://youtu.be/NppbW9ksUUc)
 ### Installation and Setup
 
 Ensure you have Python installed on your system (Python 3.6 or later recommended).
