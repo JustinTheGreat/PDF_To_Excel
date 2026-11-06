@@ -453,4 +453,7 @@ If extraction isn't working as expected:
 5. For content spanning pages, ensure the continuation field uses the (+1) suffix
 6. Check for invisible characters or formatting that might affect keyword matching
 
+## Disclaimer
+The data used in the tutorial is public test data at this link: https://www.nxp.com/testreports/340000239979_DIE_ZHM_A_SBOX.pdf
+
 *If you encounter persistent issues, consider using AI tools like Claude.ai to help develop specific extraction parameters for your documents.*
